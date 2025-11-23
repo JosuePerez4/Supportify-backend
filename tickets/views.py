@@ -60,6 +60,7 @@ class TicketAV(ListCreateAPIView):
             # 'titulo': ticket.titulo,  # eliminado
             'descripcion': ticket.descripcion,
             'equipo': ticket.equipo,
+            'prioridad': ticket.prioridad,
             'fecha_estimada': ticket.fecha_estimada.isoformat() if ticket.fecha_estimada else None,
             'repuestos': ticket.repuestos,
             'administrador': ticket.administrador.document if ticket.administrador else None,
@@ -717,6 +718,7 @@ class TicketHistoryAV(RetrieveAPIView):
             'ticket_id': ticket_id,
             'ticket_titulo': ticket.equipo,  # antes: ticket.titulo
             'estado_actual': ticket.estado.nombre if ticket.estado else 'Sin estado',
+            'prioridad_actual': ticket.prioridad,
             'tecnico_actual': ticket.tecnico.get_full_name() if ticket.tecnico else 'Sin técnico asignado',
             'total_registros': queryset.count(),
             'historial': serializer.data

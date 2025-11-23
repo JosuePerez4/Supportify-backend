@@ -21,9 +21,22 @@ class TicketSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Ticket
-        fields = '__all__'
+        fields = [
+            'id',
+            'descripcion',
+            'equipo',
+            'prioridad',        # 👈 NUEVO CAMPO VISIBLE EN LA API
+            'fecha_estimada',
+            'repuestos',
+            'administrador',
+            'tecnico',
+            'cliente',
+            'estado',
+            'fecha',
+            'creado_en',
+            'actualizado_en',
+        ]
 
-    
     def validate(self, attrs):
         admin = attrs["administrador"]
         tech = attrs["tecnico"]
@@ -333,6 +346,7 @@ class ClientTicketSerializer(serializers.ModelSerializer):
             'id',
             'equipo',
             'descripcion',
+            'prioridad', 
             'estado_nombre',
             'fecha_estimada',
             'tecnico_nombre',
