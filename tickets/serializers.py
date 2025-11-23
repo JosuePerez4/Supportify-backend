@@ -302,3 +302,34 @@ class TicketTimelineSerializer(serializers.Serializer):
     ticket_id = serializers.IntegerField()
     estado_actual = serializers.CharField()
     timeline = TimelineItemSerializer(many=True)
+
+
+class ClientTicketSerializer(serializers.ModelSerializer):
+    """
+    Serializer específico para que los clientes vean el estado de sus tickets.
+    Incluye: etapa actual, fecha estimada de entrega y técnico responsable.
+    """
+    estado_nombre = serializers.CharField(source='estado.nombre', read_only=True)
+    tecnico_nombre = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Ticket
+        fields = [
+            'id',
+            'equipo',
+            'descripcion',
+            'estado_nombre',
+            'fecha_estimada',
+            'tecnico_nombre',
+            'fecha',
+            'creado_en',
+            'actualizado_en',
+            'repuestos'
+        ]
+        read_only_fields = fields
+    
+    def get_tecnico_nombre(self, obj):
+        """Retorna el nombre completo del técnico asignado"""
+        if obj.tecnico:
+            return obj.tecnico.get_full_name()
+        return None
