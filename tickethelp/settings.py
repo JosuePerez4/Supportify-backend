@@ -150,16 +150,43 @@ REST_FRAMEWORK = {
 # -----------------------------
 # CORS
 # -----------------------------
-FRONTEND_ORIGIN = os.getenv(
-    "FRONTEND_ORIGIN",
-    "https://tickethelp-frontend.onrender.com",  # valor por defecto en prod
-)
-CORS_ALLOWED_ORIGINS = [
-    FRONTEND_ORIGIN,
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+# Permitir solicitudes desde cualquier origen (útil para desarrollo)
+# En producción, considera restringir a orígenes específicos
+CORS_ALLOW_ALL_ORIGINS = True  # Permite solicitudes desde cualquier origen
 CORS_ALLOW_CREDENTIALS = True
+
+# Configuración adicional para permitir todos los métodos y headers
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# Si en el futuro quieres restringir a orígenes específicos, usa esto:
+# FRONTEND_ORIGIN = os.getenv(
+#     "FRONTEND_ORIGIN",
+#     "https://tickethelp-frontend.onrender.com",
+# )
+# CORS_ALLOWED_ORIGINS = [
+#     FRONTEND_ORIGIN,
+#     "http://localhost:5173",
+#     "http://127.0.0.1:5173",
+# ]
 
 # -----------------------------
 # CONFIGURACIÓN DE CORREO ELECTRÓNICO
