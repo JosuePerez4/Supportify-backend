@@ -46,6 +46,13 @@ class NotificationConfig:
             'enviar_a_tecnico': False,
             'enviar_a_admin': True,
         },
+        'solicitud_aprobacion_pruebas': {
+            'nombre': 'Solicitud de Aprobación de Pruebas',
+            'descripcion': 'Notificación al admin cuando un ticket pasa a pruebas y requiere aprobación para finalizar',
+            'enviar_a_cliente': False,
+            'enviar_a_tecnico': False,
+            'enviar_a_admin': True,
+        },
         'cambio_estado_aprobado': {
             'nombre': 'Cambio de Estado Aprobado',
             'descripcion': 'Notificación cuando una solicitud de cambio de estado es aprobada',
