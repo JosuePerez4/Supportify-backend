@@ -5,6 +5,7 @@ from tickets.views import (
     TicketTimelineAV, TestingApprovalAV, TicketHistoryAV,
     ClientTicketListView, ClientTicketDetailView
 )
+from tickets import repuestos_urls
 
 urlpatterns = [
     # Listar tickets y crear tickets
@@ -45,3 +46,6 @@ urlpatterns = [
     path('client/tickets/', ClientTicketListView.as_view(), name="client-tickets-list"),
     path('client/tickets/<int:ticket_id>/', ClientTicketDetailView.as_view(), name="client-ticket-detail"),
 ]
+
+# Incluir URLs de repuestos
+urlpatterns += repuestos_urls.urlpatterns

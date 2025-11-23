@@ -19,6 +19,7 @@ from tickets.serializers import (
 )
 from notifications.services import NotificationService
 from rest_framework import viewsets, permissions
+from rest_framework.generics import RetrieveUpdateDestroyAPIView
 from .models import TicketHistory
 from .serializers import TicketHistorySerializer
 
