@@ -208,7 +208,10 @@ class StateApprovalSerializer(serializers.Serializer):
 
 
 class PendingApprovalSerializer(serializers.ModelSerializer):
-    ticket_titulo = serializers.CharField(source='ticket.titulo', read_only=True)
+    ticket_titulo = serializers.CharField(
+        source='ticket.equipo',  # antes: ticket.titulo
+        read_only=True
+    )
     requested_by_name = serializers.CharField(source='requested_by.get_full_name', read_only=True)
     from_state_name = serializers.CharField(source='from_state.nombre', read_only=True)
     to_state_name = serializers.CharField(source='to_state.nombre', read_only=True)
