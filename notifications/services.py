@@ -178,6 +178,69 @@ class NotificationService:
         return resultados
     
     @classmethod
+    def enviar_solicitud_aprobacion_pruebas(cls, ticket: Ticket, tecnico: User, state_request) -> Dict[str, Any]:
+        """
+        Notificación mejorada al administrador cuando un ticket pasa a pruebas.
+        Informa claramente que necesita aprobar las pruebas para finalizar el ticket.
+        """
+        resultados = {
+            'emails_enviados': 0,
+            'emails_fallidos': 0,
+            'notificaciones_internas': 0,
+            'errores': []
+        }
+        
+        try:
+            # Pre-cargar información del ticket
+            ticket_pk = ticket.pk
+            equipo = ticket.equipo or "Sin especificar"
+            tecnico_nombre = tecnico.get_full_name() if tecnico else "Técnico desconocido"
+            tecnico_email = tecnico.email if tecnico else "N/A"
+            fecha_estimada = ticket.fecha_estimada.strftime('%d/%m/%Y') if ticket.fecha_estimada else "No especificada"
+            reason = state_request.reason or "Sin razón especificada"
+            
+            # Obtener todos los administradores activos
+            administradores = User.objects.filter(role=User.Role.ADMIN, is_active=True)
+            
+            for admin in administradores:
+                # Mensaje más detallado y claro
+                mensaje = (
+                    f'El técnico {tecnico_nombre} ({tecnico_email}) ha completado las pruebas del ticket #{ticket_pk}.\n\n'
+                    f'Detalles del ticket:\n'
+                    f'- Equipo: {equipo}\n'
+                    f'- Técnico responsable: {tecnico_nombre}\n'
+                    f'- Fecha estimada de entrega: {fecha_estimada}\n'
+                    f'- Razón: {reason}\n\n'
+                    f'⚠️ ACCIÓN REQUERIDA: Debe revisar y aprobar las pruebas para finalizar el ticket.\n'
+                    f'Puede aprobar o rechazar las pruebas desde el panel de administración.'
+                )
+                
+                cls._enviar_notificacion_admin(
+                    ticket, 'solicitud_aprobacion_pruebas',
+                    '⚠️ Aprobación de Pruebas Requerida',
+                    mensaje,
+                    resultados,
+                    usuario_destino=admin,
+                    datos_adicionales={
+                        'state_request_id': state_request.id,
+                        'ticket_id': ticket_pk,
+                        'equipo': equipo,
+                        'tecnico_nombre': tecnico_nombre,
+                        'tecnico_email': tecnico_email,
+                        'fecha_estimada': fecha_estimada,
+                        'reason': reason,
+                        'action_required': True,
+                        'action_type': 'approve_testing'
+                    }
+                )
+                
+        except Exception as e:
+            logger.error(f"Error enviando solicitud de aprobación de pruebas: {e}")
+            resultados['errores'].append(str(e))
+        
+        return resultados
+    
+    @classmethod
     def enviar_aprobacion_cambio_estado(cls, state_request) -> Dict[str, Any]:
         resultados = {
             'emails_enviados': 0,
@@ -190,7 +253,7 @@ class NotificationService:
             # Optimización: Pre-cargar relaciones y cachear valores usados múltiples veces
             ticket = state_request.ticket
             ticket_pk = ticket.pk
-            ticket_titulo = ticket.titulo
+            ticket_equipo = ticket.equipo or "Sin especificar"
             to_state_nombre = state_request.to_state.nombre
             from_state_nombre = state_request.from_state.nombre
             
@@ -223,7 +286,7 @@ class NotificationService:
                 cls._enviar_notificacion_cliente(
                     ticket, 'estado_cambiado',
                     f'Estado del ticket actualizado a "{to_state_nombre}"',
-                    f'El estado de su ticket #{ticket_pk} "{ticket_titulo}" ha sido actualizado a "{to_state_nombre}".',
+                    f'El estado de su ticket #{ticket_pk} "{ticket_equipo}" ha sido actualizado a "{to_state_nombre}".',
                     resultados,
                     datos_adicionales={
                         'state_request_id': state_request.id,
@@ -268,7 +331,7 @@ class NotificationService:
             # Optimización: Pre-cargar relaciones y cachear valores usados múltiples veces
             ticket = state_request.ticket
             ticket_pk = ticket.pk
-            ticket_titulo = ticket.titulo
+            ticket_equipo = ticket.equipo or "Sin especificar"
             to_state_nombre = state_request.to_state.nombre
             from_state_nombre = state_request.from_state.nombre
             rejection_reason = state_request.rejection_reason or "Sin razón especificada"
@@ -304,7 +367,7 @@ class NotificationService:
                 cls._enviar_notificacion_cliente(
                     ticket, 'cambio_estado_rechazado',
                     'Solicitud de cambio de estado rechazada',
-                    f'La solicitud para cambiar el estado del ticket #{ticket_pk} "{ticket_titulo}" a "{to_state_nombre}" ha sido rechazada. El ticket permanecerá en "{from_state_nombre}".',
+                    f'La solicitud para cambiar el estado del ticket #{ticket_pk} "{ticket_equipo}" a "{to_state_nombre}" ha sido rechazada. El ticket permanecerá en "{from_state_nombre}".',
                     resultados,
                     datos_adicionales={
                         'state_request_id': state_request.id,
@@ -355,11 +418,12 @@ class NotificationService:
             approval_message = state_request.reason if state_request else None
             
             # Notificar al cliente
+            ticket_equipo = ticket.equipo or "Sin especificar"
             if ticket.cliente:
                 cls._enviar_notificacion_cliente(
                     ticket, 'ticket_cerrado',
                     'Ticket finalizado',
-                    f'Su ticket #{ticket.pk} "{ticket.titulo}" ha sido finalizado exitosamente.',
+                    f'Su ticket #{ticket.pk} "{ticket_equipo}" ha sido finalizado exitosamente.',
                     resultados,
                     datos_adicionales={
                         'estado_anterior': estado_anterior,
@@ -375,7 +439,7 @@ class NotificationService:
                 cls._enviar_notificacion_tecnico(
                     ticket, 'ticket_cerrado',
                     'Ticket finalizado',
-                    f'El ticket #{ticket.pk} "{ticket.titulo}" que tenía asignado ha sido finalizado exitosamente.',
+                    f'El ticket #{ticket.pk} "{ticket_equipo}" que tenía asignado ha sido finalizado exitosamente.',
                     resultados,
                     datos_adicionales={
                         'estado_anterior': estado_anterior,
@@ -609,6 +673,7 @@ class NotificationService:
             (User.Role.ADMIN, 'ticket_creado'): 'emails/ticket_created_admin.html',
             (User.Role.ADMIN, 'solicitud_finalizacion'): 'emails/ticket_created_admin.html',
             (User.Role.ADMIN, 'solicitud_cambio_estado'): 'emails/state_change_request_admin.html',
+            (User.Role.ADMIN, 'solicitud_aprobacion_pruebas'): 'emails/state_change_request_admin.html',
         }
         
         plantilla = plantillas.get((usuario.role, tipo_codigo))
@@ -625,6 +690,7 @@ class NotificationService:
     
     @classmethod
     def _generar_contenido_texto_plano(cls, usuario: User, ticket: Ticket, titulo: str, mensaje: str) -> str:
+        equipo = ticket.equipo or "Sin especificar"
         return f"""
 {titulo}
 
@@ -634,7 +700,7 @@ Hola {usuario.first_name or usuario.email},
 
 Detalles del Ticket:
 - ID: #{ticket.pk}
-- Título: {ticket.titulo}
+- Equipo: {equipo}
 - Estado: {ticket.estado.nombre}
 - Fecha: {ticket.fecha}
 

@@ -278,10 +278,10 @@ class StateChangeAV(UpdateAPIView):
         to_state = serializer.validated_data['to_state']
         reason = serializer.validated_data.get('reason', '')
         
-        # Cuando se cambia al estado 4 (trial), crear automáticamente la solicitud de finalización
+        # Cuando se cambia al estado 5 (trial/pruebas), crear automáticamente la solicitud de finalización
         if to_state.codigo == "trial":
             try:
-                estado_finalizado = Estado.objects.get(codigo='finalized')
+                estado_finalizado = Estado.objects.get(codigo='closed')
             except Estado.DoesNotExist:
                 return Response({
                     'error': 'Error del sistema',
@@ -296,13 +296,12 @@ class StateChangeAV(UpdateAPIView):
             ticket.save(update_fields=['estado'])
             
             # Notificar al cliente sobre el cambio de estado
-            # (El signal también lo hará, pero con la bandera evitamos duplicación)
             try:
                 NotificationService.enviar_notificacion_estado_cambiado(ticket, estado_anterior_nombre)
             except Exception as e:
                 logger.error(f"Error enviando notificación de cambio de estado al cliente: {e}")
             
-            # Crear StateChangeRequest aprobado para el cambio al estado 4
+            # Crear StateChangeRequest aprobado para el cambio al estado 5 (pruebas)
             StateChangeRequest.objects.create(
                 ticket=ticket,
                 requested_by=user,
@@ -324,18 +323,27 @@ class StateChangeAV(UpdateAPIView):
                 reason=reason or "Solicitud de finalización desde estado en pruebas"
             )
             
-            # Notificar al administrador sobre la solicitud de finalización
+            # Notificar al administrador sobre la solicitud de aprobación de pruebas
             try:
-                NotificationService.enviar_solicitud_cambio_estado(state_request)
+                NotificationService.enviar_solicitud_aprobacion_pruebas(ticket, user, state_request)
             except Exception as e:
-                logger.error(f"Error enviando notificación de solicitud de finalización: {e}")
+                logger.error(f"Error enviando notificación de solicitud de aprobación de pruebas: {e}")
+            
+            # Registrar cambio en historial
+            TicketHistory.crear_entrada_historial(
+                ticket=ticket,
+                accion=f"Cambio de estado de '{estado_anterior_nombre}' a '{to_state.nombre}'",
+                realizado_por=user,
+                estado_anterior=estado_anterior_nombre
+            )
             
             return Response({
-                'message': 'El ticket pasó a "Pruebas" y se creó la solicitud de finalización.',
+                'message': 'El ticket pasó a "Pruebas". Se requiere aprobación del administrador para finalizar.',
                 'ticket_id': ticket.pk,
                 'new_state': to_state.nombre,
                 'request_id': state_request.id,
-                'status': 'pending_approval'
+                'status': 'pending_approval',
+                'note': 'El administrador debe aprobar las pruebas para finalizar el ticket.'
             }, status=status.HTTP_200_OK)
 
         if to_state.es_final:
@@ -440,7 +448,7 @@ class TestingApprovalAV(UpdateAPIView):
 
         if action == "approve":
             # Pasar de "Pruebas" a "Finalizado"
-            estado_final = get_object_or_404(Estado, codigo="finalized")
+            estado_final = get_object_or_404(Estado, codigo="closed")
             
             # Buscar la solicitud pendiente original (de trial a finalized)
             # Optimización: precargar relaciones necesarias para evitar queries N+1
