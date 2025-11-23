@@ -153,39 +153,55 @@ class StateChangeSerializer(serializers.Serializer):
         # Validar transiciones de estado
         current_id = ticket.estado_id
         
-        # Permitir transiciones lineales normales (N a N+1)
-        next_allowed_id = (current_id or 0) + 1
-        
         # Validar transición
         is_valid_transition = False
         
-        # Transición especial: de estado 3 (En reparación) a estado 6 (Pruebas)
-        # Esto es necesario porque el estado 4 es "Finalizado" (inactivo)
-        if current_id == 3 and to_state.codigo == "trial":
-            # Permitir ir de "En reparación" (3) directamente a "Pruebas" (6)
-            is_valid_transition = True
-        elif to_state.id == next_allowed_id:
-            # Transición lineal normal
-            is_valid_transition = True
-        elif current_id == 6 and to_state.id == 5:
-            # Bloquear transición directa de "Pruebas" (6) a "Finalizado" (5)
-            # El cambio a estado 6 automáticamente crea una solicitud de finalización
-            raise serializers.ValidationError({
-                "to_state": "No se puede pasar directamente de 'Pruebas' a 'Finalizado'. El cambio a 'Pruebas' crea automáticamente una solicitud de finalización que debe ser aprobada por el administrador."
-            })
-        
-        if not is_valid_transition:
-            # Si es estado 3, mostrar que puede ir a 4 o 6
-            if current_id == 3:
-                raise serializers.ValidationError({
-                    "to_state": f"Transición inválida. Desde 'En reparación' (3) solo se permite avanzar a 'Pruebas' (6)."
-                })
+        # Estados 1, 2, 3 deben recorrerse secuencialmente (no se puede saltar)
+        if current_id in [1, 2]:
+            # Desde estado 1 o 2, solo se puede avanzar al siguiente estado (N+1)
+            next_allowed_id = current_id + 1
+            if to_state.id == next_allowed_id:
+                is_valid_transition = True
             else:
                 raise serializers.ValidationError({
-                    "to_state": f"Transición inválida. Solo se permite avanzar de {current_id} a {next_allowed_id}."
+                    "to_state": f"Transición inválida. Desde el estado actual ({ticket.estado.nombre}) solo se puede avanzar al siguiente estado secuencial (ID: {next_allowed_id})."
                 })
+        
+        # Desde estado 3 (En reparación), se puede ir a:
+        # - Estado 4 (Esperando repuestos) O
+        # - Estado 5 (Pruebas/trial)
+        elif current_id == 3:
+            if to_state.id == 4:  # Esperando repuestos
+                is_valid_transition = True
+            elif to_state.codigo == "trial":  # Pruebas (ID 5)
+                is_valid_transition = True
+            else:
+                raise serializers.ValidationError({
+                    "to_state": "Transición inválida. Desde 'En reparación' solo se puede avanzar a 'Esperando repuestos' (ID: 4) o directamente a 'Pruebas' (ID: 5)."
+                })
+        
+        # Desde estado 4 (Esperando repuestos), solo se puede ir a estado 5 (Pruebas)
+        elif current_id == 4:
+            if to_state.id == 5 or to_state.codigo == "trial":  # Pruebas (ID 5)
+                is_valid_transition = True
+            else:
+                raise serializers.ValidationError({
+                    "to_state": "Transición inválida. Desde 'Esperando repuestos' solo se puede avanzar a 'Pruebas' (ID: 5)."
+                })
+        
+        # Desde estado 5 (Pruebas), no se puede cambiar directamente (requiere aprobación del admin)
+        elif current_id == 5 and to_state.codigo == "trial":
+            raise serializers.ValidationError({
+                "to_state": "No se puede cambiar el estado desde 'Pruebas'. El ticket está pendiente de aprobación del administrador."
+            })
+        
+        # Si no es ninguna de las transiciones válidas anteriores
+        if not is_valid_transition and current_id not in [1, 2, 3, 4, 5]:
+            raise serializers.ValidationError({
+                "to_state": f"Transición inválida desde el estado actual ({ticket.estado.nombre})."
+            })
 
-        # (Opcional) valida que el estado esté activo si manejas 'es_activo'
+        # Validar que el estado esté activo
         if hasattr(to_state, 'es_activo') and not to_state.es_activo:
             raise serializers.ValidationError({"to_state": "El estado destino no está activo."})
 
