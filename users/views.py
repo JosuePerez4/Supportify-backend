@@ -21,7 +21,7 @@ from .serializers import (
     UserUpdateProfilePictureSerializer,
     ChangePasswordSerializer,
     ChangePasswordByIdSerializer,
-    EmailTokenObtainPairSerializer
+    EmailTokenObtainPairSerializer,
 )
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import AccessToken
@@ -33,7 +33,7 @@ User = get_user_model()
 class IsAdmin(permissions.BasePermission):
     def has_permission(self, request, view) -> bool:
         user = request.user
-        return bool(user and user.is_authenticated and (getattr(user, 'role', None) == 'ADMIN' or user.is_superuser))
+        return bool(user and user.is_authenticated and (getattr(user, 'role', None) in ('ADMIN', 'OWNER')or user.is_superuser))
 
 # Maneja las vistas para los usuarios
 class UserViewSet(viewsets.ModelViewSet):
@@ -137,6 +137,9 @@ class ClientViewSet(BaseRoleViewSet):
     permission_classes = [IsAdminOrTechnicianOrClient]
 def get_serializer_class(self):
         return UserCreateSerializer if self.action in ('create', 'update', 'partial_update') else UserReadSerializer
+class OwnerViewSet(BaseRoleViewSet):
+    ROLE = 'OWNER'
+    permission_classes = [IsAdmin]
 
 class UserUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]

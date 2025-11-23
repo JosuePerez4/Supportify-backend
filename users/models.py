@@ -6,6 +6,7 @@ class User(AbstractUser):
         ADMIN  = 'ADMIN',  'Administrador'
         TECH   = 'TECH',   'Técnico'
         CLIENT = 'CLIENT', 'Cliente'
+        OWNER  = 'OWNER',  'Dueño'
     
     username = None
     email = models.EmailField(unique=True)
@@ -35,6 +36,7 @@ class _RoleQS(models.Manager):
 class AdminManager(_RoleQS):   ROLE = User.Role.ADMIN
 class TechManager(_RoleQS):    ROLE = User.Role.TECH
 class ClientManager(_RoleQS):  ROLE = User.Role.CLIENT
+class OwnerManager(_RoleQS):   ROLE = User.Role.OWNER
 
 class Admin(User):
     objects = AdminManager()
@@ -64,4 +66,15 @@ class Client(User):
         verbose_name_plural = "Clientes"
     def save(self, *args, **kwargs):
         self.role = User.Role.CLIENT
+        return super().save(*args, **kwargs)
+
+class Owner(User):
+    objects = OwnerManager()
+    class Meta:
+        proxy = True
+        verbose_name = "Dueño"
+        verbose_name_plural = "Dueños"
+
+    def save(self, *args, **kwargs):
+        self.role = User.Role.OWNER
         return super().save(*args, **kwargs)
