@@ -1,15 +1,16 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import pre_save
 from django.dispatch import receiver
 import json
 
+
 class Estado(models.Model):
-    codigo    = models.SlugField(max_length=32, unique=True)  
+    codigo    = models.SlugField(max_length=32, unique=True)
     nombre    = models.CharField(max_length=60, unique=True)
-    es_activo = models.BooleanField(default=True)  
-    es_final  = models.BooleanField(default=False) 
+    es_activo = models.BooleanField(default=True)
+    es_final  = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Estado"
@@ -20,8 +21,19 @@ class Estado(models.Model):
         return f"{self.nombre} ({self.codigo})"
 
 
+# -------------------------------------------------------
+#  PRIORIDAD
+# -------------------------------------------------------
+PRIORIDAD_CHOICES = [
+    ('low', 'Baja'),
+    ('medium', 'Media'),
+    ('high', 'Alta'),
+    ('urgent', 'Urgente'),
+]
+
+
 class Ticket(models.Model):
-    # Relaciones según tu MER
+    # Relaciones
     administrador = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True, blank=False,
@@ -47,30 +59,32 @@ class Ticket(models.Model):
         related_name="tickets",
     )
 
-    # ✂️ SE ELIMINA titulo
-    # titulo = models.CharField(max_length=200)
-
-    # Campos propios del ticket
+    # Datos principales del ticket
     descripcion  = models.TextField(blank=True)
     equipo       = models.CharField(max_length=120, blank=True)
 
-    # ✅ Nueva fecha estimada (la escribe el usuario, no es auto)
+    # -------- PRIORIDAD ---------
+    prioridad = models.CharField(
+        max_length=10,
+        choices=PRIORIDAD_CHOICES,
+        default="medium"
+    )
+
+    # Fechas
     fecha_estimada = models.DateField(
         null=True,
         blank=True,
         help_text="Fecha estimada ingresada por quien crea el ticket."
     )
 
-    # ✅ Repuestos opcional
     repuestos = models.TextField(
         null=True,
         blank=True,
         help_text="Repuestos utilizados o requeridos (opcional)."
     )
 
-    # Fecha de creación del ticket (la que ya tenías)
-    fecha        = models.DateTimeField(default=timezone.now)
-    creado_en    = models.DateTimeField(auto_now_add=True)
+    fecha = models.DateTimeField(default=timezone.now)
+    creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -81,7 +95,6 @@ class Ticket(models.Model):
         ordering = ["-creado_en"]
 
     def __str__(self):
-        # Como ya no hay título, muestro equipo + estado
         base = self.equipo if self.equipo else "Ticket sin equipo"
         return f"[#{self.pk}] {base} · {self.estado.nombre}"
 
@@ -125,7 +138,7 @@ class TicketHistory(models.Model):
     accion = models.CharField(max_length=200)
     fecha = models.DateTimeField(auto_now_add=True)
     realizado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='acciones_realizadas')
-    datos_ticket = models.JSONField(null=True, blank=True, help_text="Datos del ticket al momento de la acción")
+    datos_ticket = models.JSONField(null=True, blank=True)
 
     class Meta:
         ordering = ['-fecha']
@@ -140,14 +153,12 @@ class TicketHistory(models.Model):
     
     @staticmethod
     def crear_entrada_historial(ticket, accion, realizado_por, estado_anterior=None, tecnico_anterior=None, datos_ticket=None):
-        """
-        Método helper para crear entradas en el historial.
-        """
+
         if datos_ticket is None:
             datos_ticket = {
-                # 'titulo': ticket.titulo,  # ❌ ya no existe
                 'descripcion': ticket.descripcion,
                 'equipo': ticket.equipo,
+                'prioridad': ticket.prioridad,  # 👈 AÑADIDO
                 'fecha_estimada': ticket.fecha_estimada.isoformat() if ticket.fecha_estimada else None,
                 'repuestos': ticket.repuestos,
                 'administrador': ticket.administrador.document if ticket.administrador else None,
