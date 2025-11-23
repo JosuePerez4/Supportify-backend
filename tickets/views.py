@@ -56,9 +56,11 @@ class TicketAV(ListCreateAPIView):
         
         # Crear entrada en el historial con todos los datos del ticket
         datos_ticket = {
-            'titulo': ticket.titulo,
+            # 'titulo': ticket.titulo,  # eliminado
             'descripcion': ticket.descripcion,
             'equipo': ticket.equipo,
+            'fecha_estimada': ticket.fecha_estimada.isoformat() if ticket.fecha_estimada else None,
+            'repuestos': ticket.repuestos,
             'administrador': ticket.administrador.document if ticket.administrador else None,
             'administrador_nombre': ticket.administrador.get_full_name() if ticket.administrador else None,
             'cliente': ticket.cliente.document if ticket.cliente else None,
@@ -693,7 +695,7 @@ class TicketHistoryAV(RetrieveAPIView):
         return Response({
             'message': 'Historial del ticket obtenido exitosamente',
             'ticket_id': ticket_id,
-            'ticket_titulo': ticket.titulo,
+            'ticket_titulo': ticket.equipo,  # antes: ticket.titulo
             'estado_actual': ticket.estado.nombre if ticket.estado else 'Sin estado',
             'tecnico_actual': ticket.tecnico.get_full_name() if ticket.tecnico else 'Sin técnico asignado',
             'total_registros': queryset.count(),
