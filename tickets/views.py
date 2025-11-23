@@ -15,7 +15,7 @@ from tickets.serializers import (
     TicketSerializer, EstadoSerializer, LeastBusyTechnicianSerializer,
     ChangeTechnicianSerializer, ActiveTechnicianSerializer, StateChangeSerializer,
     StateApprovalSerializer, PendingApprovalSerializer,
-    TicketTimelineSerializer
+    TicketTimelineSerializer, ClientTicketSerializer
 )
 from notifications.services import NotificationService
 from rest_framework import viewsets, permissions
@@ -855,3 +855,100 @@ class TicketTimelineAV(RetrieveAPIView):
                 })
         
         return timeline
+
+
+class ClientTicketListView(ListAPIView):
+    """
+    Vista para que los clientes vean todos sus tickets con información del estado,
+    fecha estimada de entrega y técnico responsable.
+    Solo pueden ver sus propios tickets.
+    """
+    serializer_class = ClientTicketSerializer
+    permission_classes = [IsClient]
+    
+    def get_queryset(self):
+        """
+        Retorna solo los tickets del cliente autenticado.
+        """
+        user = self.request.user
+        if not user or not user.is_authenticated or user.role != User.Role.CLIENT:
+            return Ticket.objects.none()
+        
+        return Ticket.objects.filter(
+            cliente=user
+        ).select_related(
+            'estado', 'tecnico'
+        ).order_by('-creado_en')
+    
+    def list(self, request, *args, **kwargs):
+        """
+        Lista todos los tickets del cliente con información resumida.
+        """
+        queryset = self.get_queryset()
+        
+        if not queryset.exists():
+            return Response({
+                'message': 'No tienes tickets registrados.',
+                'tickets': []
+            }, status=status.HTTP_200_OK)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            'message': 'Lista de tickets obtenida exitosamente',
+            'total_tickets': queryset.count(),
+            'tickets': serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+class ClientTicketDetailView(RetrieveAPIView):
+    """
+    Vista para que los clientes vean los detalles de un ticket específico,
+    incluyendo estado actual, fecha estimada de entrega y técnico responsable.
+    Solo pueden ver sus propios tickets.
+    """
+    serializer_class = ClientTicketSerializer
+    permission_classes = [IsClient]
+    
+    def get_queryset(self):
+        """
+        Retorna solo los tickets del cliente autenticado.
+        """
+        user = self.request.user
+        if not user or not user.is_authenticated or user.role != User.Role.CLIENT:
+            return Ticket.objects.none()
+        
+        return Ticket.objects.filter(
+            cliente=user
+        ).select_related(
+            'estado', 'tecnico'
+        )
+    
+    def get_object(self):
+        """
+        Obtiene el ticket específico y valida que pertenezca al cliente autenticado.
+        """
+        ticket_id = self.kwargs.get('ticket_id')
+        user = self.request.user
+        
+        if not user or not user.is_authenticated or user.role != User.Role.CLIENT:
+            # Lanzar excepción en lugar de retornar Response
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Debe autenticarse como cliente para ver sus tickets.')
+        
+        ticket = get_object_or_404(
+            Ticket.objects.filter(cliente=user),
+            pk=ticket_id
+        )
+        
+        return ticket
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Retorna los detalles de un ticket específico del cliente.
+        """
+        ticket = self.get_object()
+        serializer = self.get_serializer(ticket)
+        return Response({
+            'message': 'Ticket obtenido exitosamente',
+            'ticket': serializer.data
+        }, status=status.HTTP_200_OK)

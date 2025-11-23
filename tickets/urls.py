@@ -2,7 +2,8 @@ from django.urls import path
 from tickets.views import (
     TicketAV, EstadoAV, LeastBusyTechnicianAV, ChangeTechnicianAV, 
     ActiveTechniciansAV, StateChangeAV, PendingApprovalsAV, TicketListView, 
-    TicketTimelineAV, TestingApprovalAV, TicketHistoryAV
+    TicketTimelineAV, TestingApprovalAV, TicketHistoryAV,
+    ClientTicketListView, ClientTicketDetailView
 )
 
 urlpatterns = [
@@ -40,4 +41,7 @@ urlpatterns = [
     path('client/tickets/<int:ticket_id>/timeline/', TicketTimelineAV.as_view(), name="ticket-timeline"),
     # Aprobar/rechazar estado de pruebas de un ticket (estado crítico)
     path('tickets/testing-approval/<int:ticket_id>/', TestingApprovalAV.as_view(), name="ticket-testing-approval"),
+    # Endpoints para clientes: ver sus tickets con estado, fecha estimada y técnico
+    path('client/tickets/', ClientTicketListView.as_view(), name="client-tickets-list"),
+    path('client/tickets/<int:ticket_id>/', ClientTicketDetailView.as_view(), name="client-ticket-detail"),
 ]
