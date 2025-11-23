@@ -121,66 +121,77 @@ class ChangeTechnicianAV(UpdateAPIView):
         
         serializer = self.get_serializer(data=request.data)
 
-        if serializer.is_valid():
-            new_technician = serializer.validated_data['documento_tecnico']
-            old_technician = ticket.tecnico
-            
-            # Obtener el usuario que está realizando el cambio
-            user_document = request.query_params.get('user_document')
-            if user_document:
-                try:
-                    usuario_cambio = User.objects.get(document=user_document)
-                except User.DoesNotExist:
-                    usuario_cambio = None
-            else:
-                usuario_cambio = getattr(request, 'user', None)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-            if new_technician != old_technician:
-                ticket.tecnico = new_technician
-                try:
-                    ticket.save()
-                except Exception as e:
-                    logger = __import__('logging').getLogger(__name__)
-                    logger.error(f"Error guardando ticket al cambiar técnico: {e}")
-                    return Response({'error': 'error_saving_ticket', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            else:
-                return Response({
-                    'error': 'No se puede asignar el mismo técnico',
-                    'message': 'El técnico actual es el mismo que el nuevo.'
-                }, status=status.HTTP_400_BAD_REQUEST)
+        new_technician = serializer.validated_data['documento_tecnico']  # objeto User
+        old_technician = ticket.tecnico
+        nueva_fecha = serializer.validated_data.get('fecha_estimada', None)
 
-            # Crear entrada en el historial
-            # Escenario 2: Guardar en historial el técnico cambiado con el estado al que llegó
-            # El estado "al que llegó" es el estado actual del ticket (ticket.estado)
-            # El método crear_entrada_historial ya guarda el estado actual en el campo 'estado'
-            TicketHistory.crear_entrada_historial(
-                ticket=ticket,
-                accion=f"Cambio de técnico de {old_technician.get_full_name() if old_technician else 'Sin técnico'} a {new_technician.get_full_name()}",
-                realizado_por=usuario_cambio,
-                tecnico_anterior=old_technician,
-                estado_anterior=None  # No hay cambio de estado, solo cambio de técnico
+        # Obtener el usuario que está realizando el cambio
+        user_document = request.query_params.get('user_document')
+        if user_document:
+            try:
+                usuario_cambio = User.objects.get(document=user_document)
+            except User.DoesNotExist:
+                usuario_cambio = None
+        else:
+            usuario_cambio = getattr(request, 'user', None)
+
+        cambios = []
+        tecnico_cambiado = False
+
+        # Cambio de técnico (si es diferente)
+        if new_technician != old_technician:
+            ticket.tecnico = new_technician
+            tecnico_cambiado = True
+            cambios.append(
+                f"técnico de {old_technician.get_full_name() if old_technician else 'Sin técnico'} "
+                f"a {new_technician.get_full_name()}"
             )
 
+        # Cambio de fecha estimada (si viene y es diferente)
+        if nueva_fecha is not None and nueva_fecha != getattr(ticket, 'fecha_estimada', None):
+            ticket.fecha_estimada = nueva_fecha
+            cambios.append(f"fecha estimada a {nueva_fecha}")
+
+        if not cambios:
             return Response({
-                'message': 'Técnico actualizado correctamente',
-                'ticket_id': ticket.pk,
-                'nuevo_tecnico': {
-                    'documento': new_technician.document,
-                    'email': new_technician.email,
-                    'nombre': f"{new_technician.first_name} {new_technician.last_name}"
-                }
-            }, status=status.HTTP_200_OK)
-        else:
-            # Si no hay cambio de técnico, no es necesario actualizar ni crear historial
-            return Response({
-                'message': 'No hubo cambios en el técnico.',
+                'message': 'No hubo cambios en el ticket.',
                 'ticket_id': ticket.pk
             }, status=status.HTTP_200_OK)
 
-    def get(self, request, *args, **kwargs):
+        # Guardar ticket
+        try:
+            ticket.save()
+        except Exception as e:
+            logger = __import__('logging').getLogger(__name__)
+            logger.error(f"Error guardando ticket al cambiar técnico/fecha_estimada: {e}")
+            return Response(
+                {'error': 'error_saving_ticket', 'message': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # Registrar en historial
+        accion = "Actualización de " + " y ".join(cambios)
+        TicketHistory.crear_entrada_historial(
+            ticket=ticket,
+            accion=accion,
+            realizado_por=usuario_cambio,
+            tecnico_anterior=old_technician if tecnico_cambiado else None,
+            estado_anterior=None
+        )
+
         return Response({
-            'detail': 'Method "GET" not allowed.'
-        }, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+            'message': 'Ticket actualizado correctamente',
+            'ticket_id': ticket.pk,
+            'tecnico': {
+                'documento': ticket.tecnico.document,
+                'nombre_completo': f"{ticket.tecnico.first_name} {ticket.tecnico.last_name}"
+            },
+            'fecha_estimada': ticket.fecha_estimada
+        }, status=status.HTTP_200_OK)
+
 
 
 class ActiveTechniciansAV(ListAPIView):

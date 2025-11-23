@@ -1,5 +1,5 @@
 from rest_framework.routers import DefaultRouter
-from .views import UserViewSet, AdminViewSet, TechnicianViewSet, ClientViewSet, UserUpdateView, ChangePasswordView, ChangePasswordByIdView, UserUpdateByIdView, get_client_by_document, AdminUpdateUserView, UserUpdateProfilePictureView, EmailTokenObtainPairView, TokenValidationView, TokenUserDataView
+from .views import UserViewSet, AdminViewSet, TechnicianViewSet, ClientViewSet, UserUpdateView, ChangePasswordView, ChangePasswordByIdView, UserUpdateByIdView, get_client_by_document, AdminUpdateUserView, UserUpdateProfilePictureView, EmailTokenObtainPairView, TokenValidationView, TokenUserDataView, OwnerViewSet
 from django.urls import path, include
 urlpatterns = [
     # Listar usuarios
@@ -33,6 +33,11 @@ urlpatterns = [
     path('clients/', ClientViewSet.as_view({'get': 'list'}), name='client-list'),
     # Obtener cliente por documento
     path('clients/<str:document>/', get_client_by_document, name='get-client-by-document'),
+
+    # Listar Dueños
+    path('owners/', OwnerViewSet.as_view({'get': 'list'}), name='owner-list'),
+    # Obtener información de un dueño
+    path('owners/<str:pk>/', OwnerViewSet.as_view({'get': 'retrieve'}), name='owner-detail'),
 
     #HU03B - actualizar perfil de usuario
     path('me/', UserUpdateView.as_view(), name='users-me'), # Endpoint para que el usuario autenticado actualice su perfil

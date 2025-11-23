@@ -81,6 +81,7 @@ class LeastBusyTechnicianSerializer(serializers.Serializer):
 
 class ChangeTechnicianSerializer(serializers.Serializer):
     documento_tecnico = serializers.CharField(max_length=10, required=True, allow_blank=False)
+    fecha_estimada = serializers.DateField(required=False, allow_null=True)  # 👈 NUEVO
 
     def validate_documento_tecnico(self, value):
         if not value or value.strip() == "":
@@ -100,7 +101,6 @@ class ChangeTechnicianSerializer(serializers.Serializer):
         documento = attrs.get('documento_tecnico')
         if isinstance(documento, list) and len(documento) > 1:
             raise serializers.ValidationError({"documento_tecnico": "Solo se puede seleccionar un técnico."})
-        
         return attrs
 
 
